@@ -109,7 +109,9 @@ def chat():
   response = requests.post(
     url="https://openrouter.ai/api/v1/chat/completions",
     headers={
-      "Authorization":"Bearer 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"
+      "Authorization":"Bearer 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",
+      "HTTP-Referer": "https://render.com", # Ye zaroori hai
+      "X-Title": "Flask App"
     },
     json={
       "model":"google/gemini-2.0-flash-001",
@@ -118,6 +120,8 @@ def chat():
   )
 
   ai_data = response.json()
+  print(f"DEBUG: Status Code: {response.status_code}")
+  print(f"DEBUG: Response Body: {ai_data}")
   ai_reply = ai_data["choices"][0]["message"]["content"]
 
   conn.execute("INSERT INTO agent(user_id,role,message,session_id) VALUES(?,?,?,?)",(user_id,"assistant",ai_reply,session_id))
