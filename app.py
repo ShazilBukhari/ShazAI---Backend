@@ -13,7 +13,7 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-app.config["JWT_SECRET_KEY"] = "mysuperkey!"
+app.config["JWT_SECRET_KEY"] = "shazai_backend_super_secret_key_998877665544332211_secure"
 jwt = JWTManager(app)
 
 def get_connect():
