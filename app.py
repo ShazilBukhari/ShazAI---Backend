@@ -85,55 +85,53 @@ def login():
   access_token = create_access_token(identity=str(user[0]))
   return jsonify({"message":"Login Sucessfully","access_token":access_token}),200
 
-@app.route("/api/chat",methods=["POST"])
+@app.route("/api/chat", methods=["POST"])
 @jwt_required()
 def chat():
-  user_id = get_jwt_identity()
-  data = request.get_json()
-  message = data.get("message")
-  session_id = data.get("session")
-  if not session_id:
-    session_id = str(uuid.uuid4())
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    message = data.get("message")
+    session_id = data.get("session") or str(uuid.uuid4())
 
-  conn = get_connect()
+    conn = get_connect()
+    
+    # User message save karein
+    conn.execute("INSERT INTO agent(user_id,role,message,session_id) VALUES(?,?,?,?)",(user_id,"user",message,session_id))
+    conn.commit()
 
-  cursor = conn.execute("""SELECT role,message FROM agent WHERE session_id=? AND user_id=? ORDER BY created_at ASC""",(session_id,user_id))
-  rows = cursor.fetchall()
+    # Gemini API Key (Render settings se uthayega)
+    api_key = os.getenv("GEMINI_API_KEY")
 
-  chat_history = []
-  for row in rows:
-    role = "assistant" if row[0] == "assistant" else "user"
-    chat_history.append({"role": role, "content": row[1]})
-
-  chat_history.append({"role": "user", "content": message})
-
-  conn.execute("INSERT INTO agent(user_id,role,message,session_id) VALUES(?,?,?,?)",(user_id,"user",message,session_id))
-  conn.commit()
-
-  api_key = os.getenv("OPENROUTER_API_KEY")
-
-  response = requests.post(
-    url="https://openrouter.ai/api/v1/chat/completions",
-    headers={
-      "Authorization":f"Bearer {api_key}",
-    },
-    json={
-      "model":"google/gemini-2.0-flash-001",
-      "messages":chat_history
+    # Gemini Direct API Format
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    payload = {
+        "contents": [{
+            "parts": [{"text": message}]
+        }]
     }
-  )
 
-  ai_data = response.json()
-  ai_reply = ai_data["choices"][0]["message"]["content"]
+    try:
+        response = requests.post(url, json=payload, timeout=15)
+        ai_data = response.json()
 
-  conn.execute("INSERT INTO agent(user_id,role,message,session_id) VALUES(?,?,?,?)",(user_id,"assistant",ai_reply,session_id))
-  conn.commit()
-  conn.close()
+        # Gemini ka response structure OpenRouter se alag hota hai
+        if "candidates" in ai_data:
+            ai_reply = ai_data["candidates"][0]["content"]["parts"][0]["text"]
+            
+            # AI reply save karein
+            conn.execute("INSERT INTO agent(user_id,role,message,session_id) VALUES(?,?,?,?)",(user_id,"assistant",ai_reply,session_id))
+            conn.commit()
+            
+            return jsonify({"reply": ai_reply, "session_id": session_id}), 200
+        else:
+            print("Gemini Error:", ai_data)
+            return jsonify({"error": "Gemini API Error", "details": ai_data}), 500
 
-  return jsonify({
-    "reply":ai_reply,
-    "session_id":session_id
-  }),200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
   
 @app.route("/api/session",methods=["GET"])
 @jwt_required()
