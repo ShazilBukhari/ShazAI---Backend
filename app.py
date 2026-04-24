@@ -109,8 +109,7 @@ def chat():
   response = requests.post(
     url="https://openrouter.ai/api/v1/chat/completions",
     headers={
-      "Authorization":"Bearer"
-      "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"
+      "Authorization":"Bearer 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"
     },
     json={
       "model":"google/gemini-2.0-flash-001",
