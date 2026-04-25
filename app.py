@@ -5,6 +5,10 @@ from werkzeug.security import generate_password_hash,check_password_hash
 from flask_jwt_extended import JWTManager,create_access_token,get_jwt_identity,jwt_required
 import uuid
 import requests
+from dotenv import load_dotenv  # Import dotenv module
+import os  # To read environment variables
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -106,10 +110,12 @@ def chat():
   conn.execute("INSERT INTO agent(user_id,role,message,session_id) VALUES(?,?,?,?)",(user_id,"user",message,session_id))
   conn.commit()
 
+  api_key = os.getenv("OPENAI_API_KEY")
+
   response = requests.post(
     url="https://openrouter.ai/api/v1/chat/completions",
     headers={
-      "Authorization":"Bearer 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"
+      "Authorization": f"Bearer {api_key}"
     },
     json={
       "model":"google/gemini-2.0-flash-001",
